@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Values-Guided Reflective Journal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/luxon@3.4.4/build/global/luxon.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+:root {
+  --primary: #6C5CE7;
+  --primary-light: #A29BFE;
+  --accent: #00CEC9;
+  --warm: #FDCB6E;
+  --danger: #FF7675;
+  --bg: #0F0A1A;
+  --surface: #1A1230;
+  --surface2: #241B3D;
+  --text: #E8E4F0;
+  --text-muted: #9B8FBF;
+}
+body { background: var(--bg); color: var(--text); min-height: 100vh; min-height: 100dvh; overflow-x: hidden; }
+.glass { background: rgba(26, 18, 48, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(108, 92, 231, 0.15); }
+.glass-light { background: rgba(36, 27, 61, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(108, 92, 231, 0.1); }
+.gradient-text { background: linear-gradient(135deg, #A29BFE, #00CEC9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.gradient-bg { background: linear-gradient(135deg, #6C5CE7, #00CEC9); }
+.gradient-bg-warm { background: linear-gradient(135deg, #6C5CE7, #FDCB6E); }
+.btn-primary { background: linear-gradient(135deg, #6C5CE7, #5A4BD1); transition: all 0.3s; box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4); }
+.btn-primary:active { transform: translateY(0); }
+.mood-btn { transition: all 0.2s; }
+.mood-btn.selected { transform: scale(1.2); box-shadow: 0 0 20px rgba(108, 92, 231, 0.5); }
+textarea { background: var(--surface2); border: 1px solid rgba(108, 92, 231, 0.2); color: var(--text); resize: none; }
+textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15); }
+textarea::placeholder { color: var(--text-muted); }
+input[type="text"] { background: var(--surface2); border: 1px solid rgba(108, 92, 231, 0.2); color: var(--text); }
+input[type="text"]:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15); }
+input[type="text"]::placeholder { color: var(--text-muted); }
+.tab-active { border-bottom: 2px solid var(--primary); color: var(--text); }
+.tab-inactive { border-bottom: 2px solid transparent; color: var(--text-muted); }
+.fade-in { animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.slide-up { animation: slideUp 0.5s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.value-chip { background: rgba(108, 92, 231, 0.15); border: 1px solid rgba(108, 92, 231, 0.3); transition: all 0.2s; }
+.value-chip:hover { background: rgba(108, 92, 231, 0.25); }
+.value-chip.selected { background: rgba(108, 92, 231, 0.4); border-color: var(--primary); }
+.entry-card { transition: all 0.2s; }
+.entry-card:active { transform: scale(0.98); }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.loading-dots::after { content: ''; animation: dots 1.5s infinite; }
+@keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+.stress-low { color: #00CEC9; }
+.stress-medium { color: #FDCB6E; }
+.stress-high { color: #FF7675; }
+.progress-ring { transform: rotate(-90deg); }
+.nav-item { transition: all 0.2s; }
+.nav-item.active { color: var(--primary); }
+.nav-item.active .nav-dot { opacity: 1; }
+.nav-dot { opacity: 0; transition: all 0.2s; }
+.sentiment-bar { transition: width 0.8s ease; }
+.micro-action { border-left: 3px solid var(--accent); }
+.coping-card { background: linear-gradient(135deg, rgba(0, 206, 201, 0.1), rgba(108, 92, 231, 0.1)); border: 1px solid rgba(0, 206, 201, 0.2); }
+</style>
+</head>
+<body>
+
+<div id="app" class="max-w-lg mx-auto pb-20">
+  <!-- Header -->
+  <header class="sticky top-0 z-50 glass px-4 py-3">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-lg font-bold gradient-text">ReflectAI ✨</h1>
+        <p class="text-xs text-[var(--text-muted)]" id="headerSubtext">Your values-guided journal</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="streakBadge" class="text-sm bg-[var(--surface2)] px-2 py-1 rounded-full hidden">🔥 <span id="streakCount">0</span></span>
+        <button onclick="showSettings()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--surface2)]">⚙️</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Onboarding -->
+  <div id="onboarding" class="hidden px-4 py-6">
+    <div id="onboardStep1" class="slide-up">
+      <div class="text-center mb-8">
+        <div class="text-6xl mb-4">🌱</div>
+        <h2 class="text-2xl font-bold mb-2">Welcome to ReflectAI</h2>
+        <p class="text-[var(--text-muted)]">Let's set up your journal so it grows <em>with</em> you.</p>
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium mb-2">What's your name? 👋</label>
+        <input type="text" id="userName" placeholder="e.g., Alex" class="w-full px-4 py-3 rounded-xl text-base">
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium mb-2">What's your life purpose or main focus right now? 🎯</label>
+        <textarea id="userPurpose" rows="3" placeholder="e.g., Finding meaningful work that helps others while staying true to myself..." class="w-full px-4 py-3 rounded-xl text-base"></textarea>
+      </div>
+      <button onclick="goToStep2()" class="btn-primary w-full py-4 rounded-xl text-white font-semibold text-base">Continue →</button>
+    </div>
+
+    <div id="onboardStep2" class="hidden slide-up">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-3">💎</div>
+        <h2 class="text-xl font-bold mb-1">Choose Your Core Values</h2>
+        <p class="text-sm text-[var(--text-muted)]">Pick 3-5 that matter most to you</p>
+      </div>
+      <div id="valuesGrid" class="flex flex-wrap gap-2 mb-6"></div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium mb-2">Add your own value:</label>
+        <div class="flex gap-2">
+          <input type="text" id="customValue" placeholder="Type a value..." class="flex-1 px-4 py-3 rounded-xl text-base">
+          <button onclick="addCustomValue()" class="btn-primary px-4 py-3 rounded-xl text-white">+</button>
+        </div>
+      </div>
+      <button onclick="goToStep3()" class="btn-primary w-full py-4 rounded-xl text-white font-semibold text-base">Continue →</button>
+    </div>
+
+    <div id="onboardStep3" class="hidden slide-up">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-3">🎯</div>
+        <h2 class="text-xl font-bold mb-1">Short-term Goals</h2>
+        <p class="text-sm text-[var(--text-muted)]">What are you working toward this month?</p>
+      </div>
+      <div id="goalsContainer" class="space-y-3 mb-4">
+        <input type="text" class="goal-input w-full px-4 py-3 rounded-xl text-base" placeholder="Goal 1: e.g., Apply to 5 internships">
+        <input type="text" class="goal-input w-full px-4 py-3 rounded-xl text-base" placeholder="Goal 2: e.g., Meditate 10 min daily">
+        <input type="text" class="goal-input w-full px-4 py-3 rounded-xl text-base" placeholder="Goal 3: e.g., Read 2 books">
+      </div>
+      <button onclick="completeOnboarding()" class="btn-primary w-full py-4 rounded-xl text-white font-semibold text-base">Start Journaling ✨</button>
+    </div>
+  </div>
+
+  <!-- Main Content Views -->
+  <div id="mainContent" class="hidden">
+    <!-- Journal Tab -->
+    <div id="journalView" class="px-4 py-4 fade-in">
+      <!-- Today's Prompt -->
+      <div id="dailyPrompt" class="glass rounded-2xl p-4 mb-4">
+        <div class="flex items-start gap-3">
+          <span class="text-2xl">💡</span>
+          <div>
+            <p class="text-xs text-[var(--text-muted)] mb-1">Today's reflection prompt</p>
+            <p id="promptText" class="text-sm font-medium leading-relaxed">Loading your personalized prompt...</p>
+          </div>
+        </div>
+        <button onclick="getNewPrompt()" class="mt-3 text-xs text-[var(--primary-light)] flex items-center gap-1">🔄 New prompt</button>
+      </div>
+
+      <!-- Stress Alert -->
+      <div id="stressAlert" class="hidden coping-card rounded-2xl p-4 mb-4 fade-in">
+        <div class="flex items-start gap-3">
+          <span class="text-2xl">🧘</span>
+          <div>
+            <p class="text-sm font-semibold mb-1">Stress check-in</p>
+            <p id="stressMessage" class="text-xs text-[var(--text-muted)] mb-2"></p>
+            <button onclick="showCopingExercise()" class="text-xs bg-[var(--accent)] text-black px-3 py-1.5 rounded-lg font-medium">Try a quick exercise →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mood Selector -->
+      <div class="mb-4">
+        <p class="text-sm font-medium mb-2">How are you feeling? 🌤️</p>
+        <div class="flex gap-2 justify-between">
+          <button onclick="selectMood(1, this)" class="mood-btn w-12 h-12 rounded-xl glass-light flex items-center justify-center text-2xl" data-mood="1">😢</button>
+          <button onclick="selectMood(2, this)" class="mood-btn w-12 h-12 rounded-xl glass-light flex items-center justify-center text-2xl" data-mood="2">😟</button>
+          <button onclick="selectMood(3, this)" class="mood-btn w-12 h-12 rounded-xl glass-light flex items-center justify-center text-2xl" data-mood="3">😐</button>
+          <button onclick="selectMood(4, this)" class="mood-btn w-12 h-12 rounded-xl glass-light flex items-center justify-center text-2xl" data-mood="4">🙂</button>
+          <button onclick="selectMood(5, this)" class="mood-btn w-12 h-12 rounded-xl glass-light flex items-center justify-center text-2xl" data-mood="5">😊</button>
+          <button onclick="selectMood(6, this)" class="mood-btn w-12 h-12 rounded-xl glass-light flex items-center justify-center text-2xl" data-mood="6">🤩</button>
+        </div>
+      </div>
+
+      <!-- Journal Entry -->
+      <div class="mb-4">
+        <textarea id="journalEntry" rows="8" placeholder="What's on your mind today? Write freely — I'll help you find patterns and insights... ✍️" class="w-full px-4 py-3 rounded-2xl text-base leading-relaxed"></textarea>
+        <div class="flex justify-between items-center mt-1">
+          <span id="wordCount" class="text-xs text-[var(--text-muted)]">0 words</span>
+          <span id="realTimeSentiment" class="text-xs text-[var(--text-muted)]"></span>
+        </div>
+      </div>
+
+      <!-- Save Button -->
+      <button onclick="saveEntry()" id="saveBtn" class="btn-primary w-full py-4 rounded-xl text-white font-semibold text-base flex items-center justify-center gap-2">
+        <span id="saveBtnText">Save & Analyze ✨</span>
+        <span id="saveBtnLoading" class="hidden pulse">Analyzing<span class="loading-dots"></span></span>
+      </button>
+
+      <!-- Analysis Result -->
+      <div id="analysisResult" class="hidden mt-4 slide-up space-y-3">
+        <div class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2 flex items-center gap-2">🔍 Entry Analysis</h3>
+          <div id="analysisContent" class="text-sm text-[var(--text-muted)] leading-relaxed"></div>
+        </div>
+        <div id="valuesDetected" class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2 flex items-center gap-2">💎 Values Detected</h3>
+          <div id="valuesDetectedContent" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div id="microActions" class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2 flex items-center gap-2">⚡ Micro-Actions</h3>
+          <div id="microActionsContent" class="space-y-2"></div>
+        </div>
+        <div id="distortionsBox" class="hidden glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2 flex items-center gap-2">🧠 Thinking Patterns</h3>
+          <div id="distortionsContent" class="text-sm text-[var(--text-muted)] leading-relaxed"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="historyView" class="hidden px-4 py-4 fade-in">
+      <h2 class="text-lg font-bold mb-4">📖 Past Entries</h2>
+      <div id="entriesList" class="space-y-3"></div>
+      <div id="noEntries" class="hidden text-center py-12">
+        <div class="text-4xl mb-3">📝</div>
+        <p class="text-[var(--text-muted)]">No entries yet. Start journaling!</p>
+      </div>
+    </div>
+
+    <!-- Insights Tab -->
+    <div id="insightsView" class="hidden px-4 py-4 fade-in">
+      <h2 class="text-lg font-bold mb-4">📊 Weekly Insights</h2>
+      
+      <div id="insightsLoading" class="text-center py-8">
+        <div class="text-3xl mb-2 pulse">🔮</div>
+        <p class="text-sm text-[var(--text-muted)]">Generating your synthesis<span class="loading-dots"></span></p>
+      </div>
+
+      <div id="insightsContent" class="hidden space-y-4">
+        <!-- Mood Chart -->
+        <div class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-3">🌤️ Mood Trend</h3>
+          <canvas id="moodChart" height="150"></canvas>
+        </div>
+
+        <!-- Weekly Synthesis -->
+        <div id="weeklySynthesis" class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2 flex items-center gap-2">🔮 Weekly Synthesis</h3>
+          <div id="synthesisContent" class="text-sm text-[var(--text-muted)] leading-relaxed"></div>
+        </div>
+
+        <!-- Values Alignment -->
+        <div class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-3">💎 Values Alignment</h3>
+          <div id="valuesAlignment" class="space-y-2"></div>
+        </div>
+
+        <!-- Themes -->
+        <div class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2">🔄 Recurring Themes</h3>
+          <div id="themesContent" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Progress on Goals -->
+        <div class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-3">🎯 Goal Progress</h3>
+          <div id="goalProgress" class="space-y-3"></div>
+        </div>
+
+        <!-- Suggested Actions -->
+        <div class="glass rounded-2xl p-4">
+          <h3 class="font-semibold text-sm mb-2">⚡ This Week's Actions</h3>
+          <div id="weeklyActions" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <div id="noInsights" class="hidden text-center py-12">
+        <div class="text-4xl mb-3">📊</div>
+        <p class="text-[var(--text-muted)]">Write at least 3 entries to unlock insights!</p>
+      </div>
+    </div>
+
+    <!-- Coping Exercise Modal -->
+    <div id="copingModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-50">
+      <div class="glass w-full max-w-lg rounded-t-3xl p-6 slide-up">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-bold text-lg">🧘 Quick Exercise</h3>
+          <button onclick="closeCopingModal()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--surface2)] text-xl">✕</button>
+        </div>
+        <div id="copingContent" class="mb-4"></div>
+      </div>
+    </div>
+
+    <!-- Entry Detail Modal -->
+    <div id="entryModal" class="hidden fixed inset-0 z-50 bg-[var(--bg)] overflow-y-auto">
+      <div class="max-w-lg mx-auto px-4 py-4">
+        <div class="flex justify-between items-center mb-4">
+          <button onclick="closeEntryModal()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--surface2)]">← Back</button>
+          <button onclick="deleteEntry()" class="text-[var(--danger)] text-sm">Delete</button>
+        </div>
+        <div id="entryModalContent"></div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-[var(--bg)] overflow-y-auto">
+      <div class="max-w-lg mx-auto px-4 py-4">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-lg font-bold">⚙️ Settings</h2>
+          <button onclick="closeSettings()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--surface2)]">✕</button>
+        </div>
+        <div class="space-y-4">
+          <div class="glass rounded-2xl p-4">
+            <label class="block text-sm font-medium mb-2">Your Name</label>
+            <input type="text" id="settingsName" class="w-full px-4 py-3 rounded-xl text-base">
+          </div>
+          <div class="glass rounded-2xl p-4">
+            <label class="block text-sm font-medium mb-2">Life Purpose / Focus</label>
+            <textarea id="settingsPurpose" rows="3" class="w-full px-4 py-3 rounded-xl text-base"></textarea>
+          </div>
+          <div class="glass rounded-2xl p-4">
+            <label class="block text-sm font-medium mb-2">Core Values</label>
+            <div id="settingsValues" class="flex flex-wrap gap-2 mb-2"></div>
+            <div class="flex gap-2">
+              <input type="text" id="settingsNewValue" placeholder="Add value..." class="flex-1 px-4 py-3 rounded-xl text-base">
+              <button onclick="addSettingsValue()" class="btn-primary px-4 py-3 rounded-xl text-white">+</button>
+            </div>
+          </div>
+          <div class="glass rounded-2xl p-4">
+            <label class="block text-sm font-medium mb-2">Goals</label>
+            <div id="settingsGoals" class="space-y-2 mb-2"></div>
+            <div class="flex gap-2">
+              <input type="text" id="settingsNewGoal" placeholder="Add goal..." class="flex-1 px-4 py-3 rounded-xl text-base">
+              <button onclick="addSettingsGoal()" class="btn-primary px-4 py-3 rounded-xl text-white">+</button>
+            </div>
+          </div>
+          <button onclick="saveSettings()" class="btn-primary w-full py-4 rounded-xl text-white font-semibold">Save Changes</button>
+          <button onclick="exportData()" class="w-full py-4 rounded-xl border border-[var(--primary)] text-[var(--primary-light)] font-semibold">Export All Data 📦</button>
+          <button onclick="resetApp()" class="w-full py-3 rounded-xl text-[var(--danger)] text-sm">Reset Everything</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav id="bottomNav" class="hidden fixed bottom-0 left-0 right-0 glass z-40">
+    <div class="max-w-lg mx-auto flex justify-around py-2">
+      <button onclick="switchTab('journal')" class="nav-item flex flex-col items-center py-2 px-4 active" data-tab="journal">
+        <span class="text-xl">✍️</span>
+        <span class="text-xs mt-0.5">Journal</span>
+        <div class="nav-dot w-1 h-1 rounded-full bg-[var(--primary)] mt-0.5"></div>
+      </button>
+      <button onclick="switchTab('history')" class="nav-item flex flex-col items-center py-2 px-4" data-tab="history">
+        <span class="text-xl">📖</span>
+        <span class="text-xs mt-0.5">History</span>
+        <div class="nav-dot w-1 h-1 rounded-full bg-[var(--primary)] mt-0.5"></div>
+      </button>
+      <button onclick="switchTab('insights')" class="nav-item flex flex-col items-center py-2 px-4" data-tab="insights">
+        <span class="text-xl">📊</span>
+        <span class="text-xs mt-0.5">Insights</span>
+        <div class="nav-dot w-1 h-1 rounded-full bg-[var(--primary)] mt-0.5"></div>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<script>
+(function() {
+  // Global AI tracking
+  window.aiTotalInputTokens = 0;
+  window.aiTotalOutputTokens = 0;
+  window.aiTotalTime = 0;
+  window.aiTimeByAlias = {};
+
+  const DateTime = luxon.DateTime;
+
+  // State
+  let state = {
+    user: null,
+    entries: [],
+    selectedMood: null,
+    currentTab: 'journal',
+    viewingEntryId: null
+  };
+
+  const MOODS = { 1: '😢', 2: '😟', 3: '😐', 4: '🙂', 5: '😊', 6: '🤩' };
+  const MOOD_LABELS = { 1: 'Sad', 2: 'Anxious', 3: 'Neutral', 4: 'Good', 5: 'Happy', 6: 'Amazing' };
+  
+  const DEFAULT_VALUES = [
+    'Authenticity', 'Growth', 'Compassion', 'Creativity', 'Freedom',
+    'Justice', 'Connection', 'Adventure', 'Wisdom', 'Courage',
+    'Integrity', 'Gratitude', 'Balance', 'Resilience', 'Purpose',
+    'Curiosity', 'Kindness', 'Ambition', 'Mindfulness', 'Community'
+  ];
+
+  let selectedValues = [];
+  let moodChart = null;
+
+  // Load state
+  function loadState() {
+    try {
+      const saved = localStorage.getItem('reflectai_state');
+      if (saved) {
+        state = { ...state, ...JSON.parse(saved) };
+      }
+    } catch(e) {}
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem('reflectai_state', JSON.stringify({
+        user: state.user,
+        entries: state.entries
+      }));
+    } catch(e) {}
+  }
+
+  // AI Call helper with retry
+  async function callAI(alias, params, retries = 3) {
+    const start = performance.now();
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const res = await fetch('https://16504442930.work/run_prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alias, params })
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          if (attempt === retries - 1) {
+            // Format error with AI
+            try {
+              const errRes = await fetch('https://16504442930.work/run_prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  alias: 'genericAI',
+                  params: {
+                    prompt: `Reformat this API error into a friendly, empowering message for the user. Include the full original error. Original error: "${errText}". Return JSON with key "message" as a string.`
+                  }
+                })
+              });
+              if (errRes.ok) {
+                const errData = await errRes.json();
+                throw new Error(errData.message || errText);
+              }
+            } catch(e2) {}
+            throw new Error(`Something went wrong. Please try again. (Details: ${errText})`);
+          }
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        const data = await res.json();
+        const elapsed = performance.now() - start;
+        window.aiTotalTime += elapsed;
+        window.aiTimeByAlias[alias] = (window.aiTimeByAlias[alias] || 0) + elapsed;
+        if (data.input_tokens) window.aiTotalInputTokens += data.input_tokens;
+        if (data.output_tokens) window.aiTotalOutputTokens += data.output_tokens;
+        return data;
+      } catch(e) {
+        if (attempt === retries - 1) throw e;
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+  }
+
+  // Initialize
+  function init() {
+    loadState();
+    if (!state.user) {
+      showOnboarding();
+    } else {
+      showMain();
+    }
+  }
+
+  function showOnboarding() {
+    document.getElementById('onboarding').classList.remove('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+    document.getElementById('bottomNav').classList.add('hidden');
+    renderValuesGrid();
+  }
+
+  function renderValuesGrid() {
+    const grid = document.getElementById('valuesGrid');
+    grid.innerHTML = DEFAULT_VALUES.map(v => 
+      `<button onclick="window.toggleValue('${v}', this)" class="value-chip px-3 py-2 rounded-full text-sm">${v}</button>`
+    ).join('');
+  }
+
+  window.toggleValue = function(value, el) {
+    const idx = selectedValues.indexOf(value);
+    if (idx > -1) {
+      selectedValues.splice(idx, 1);
+      el.classList.remove('selected');
+    } else {
+      selectedValues.push(value);
+      el.classList.add('selected');
+    }
+  };
+
+  window.addCustomValue = function() {
+    const input = document.getElementById('customValue');
+    const val = input.value.trim();
+    if (val && !selectedValues.includes(val)) {
+      selectedValues.push(val);
+      const grid = document.getElementById('valuesGrid');
+      const btn = document.createElement('button');
+      btn.className = 'value-chip px-3 py-2 rounded-full text-sm selected';
+      btn.textContent = val;
+      btn.onclick = () => window.toggleValue(val, btn);
+      grid.appendChild(btn);
+      input.value = '';
+    }
+  };
+
+  window.goToStep2 = function() {
+    const name = document.getElementById('userName').value.trim();
+    if (!name) { document.getElementById('userName').focus(); return; }
+    document.getElementById('onboardStep1').classList.add('hidden');
+    document.getElementById('onboardStep2').classList.remove('hidden');
+  };
+
+  window.goToStep3 = function() {
+    if (selectedValues.length < 1) return;
+    document.getElementById('onboardStep2').classList.add('hidden');
+    document.getElementById('onboardStep3').classList.remove('hidden');
+  };
+
+  window.completeOnboarding = function() {
+    const name = document.getElementById('userName').value.trim();
+    const purpose = document.getElementById('userPurpose').value.trim();
+    const goals = Array.from(document.querySelectorAll('.goal-input'))
+      .map(i => i.value.trim()).filter(Boolean);
+
+    state.user = {
+      name,
+      purpose: purpose || 'Living an authentic and meaningful life',
+      values: [...selectedValues],
+      goals: goals.length ? goals : ['Personal growth', 'Building good habits'],
+      createdAt: new Date().toISOString()
+    };
+    state.entries = [];
+    saveState();
+    showMain();
+  };
+
+  function showMain() {
+    document.getElementById('onboarding').classList.add('hidden');
+    document.getElementById('mainContent').classList.remove('hidden');
+    document.getElementById('bottomNav').classList.remove('hidden');
+    
+    const greeting = getGreeting();
+    document.getElementById('headerSubtext').textContent = `${greeting}, ${state.user.name} 👋`;
+    
+    updateStreak();
+    switchTab('journal');
+    generateDailyPrompt();
+    checkStressLevel();
+  }
+
+  function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  function updateStreak() {
+    const badge = document.getElementById('streakBadge');
+    const countEl = document.getElementById('streakCount');
+    let streak = 0;
+    const today = DateTime.now().startOf('day');
+    
+    for (let i = 0; i < 365; i++) {
+      const day = today.minus({ days: i });
+      const hasEntry = state.entries.some(e => 
+        DateTime.fromISO(e.createdAt).startOf('day').equals(day)
+      );
+      if (hasEntry) streak++;
+      else if (i > 0) break;
+    }
+    
+    if (streak > 0) {
+      badge.classList.remove('hidden');
+      countEl.textContent = streak;
+    }
+  }
+
+  // Tab switching
+  window.switchTab = function(tab) {
+    state.currentTab = tab;
+    document.querySelectorAll('.nav-item').forEach(n => {
+      n.classList.toggle('active', n.dataset.tab === tab);
+    });
+    document.getElementById('journalView').classList.toggle('hidden', tab !== 'journal');
+    document.getElementById('historyView').classList.toggle('hidden', tab !== 'history');
+    document.getElementById('insightsView').classList.toggle('hidden', tab !== 'insights');
+
+    if (tab === 'history') renderHistory();
+    if (tab === 'insights') generateInsights();
+  };
+
+  // Daily Prompt
+  async function generateDailyPrompt() {
+    const promptEl = document.getElementById('promptText');
+    const recentEntries = state.entries.slice(-3).map(e => e.text.substring(0, 200)).join(' | ');
+    
+    try {
+      const result = await callAI('genericAI', {
+        prompt: `You are a reflective journaling coach for a college student named ${state.user.name}. 
+Their life purpose: "${state.user.purpose}"
+Their core values: ${state.user.values.join(', ')}
+Their goals: ${state.user.goals.join(', ')}
+Recent journal themes: "${recentEntries || 'No entries yet - this is their first time'}"
+Current time: ${DateTime.now().toFormat('EEEE, MMMM d')} at ${DateTime.now().toFormat('h:mm a')}
+
+Generate ONE thoughtful, specific journaling prompt that connects to their values and goals. Make it conversational, warm, and thought-provoking. Not generic — deeply personalized.
+
+Return JSON with exactly this structure:
+{
+  "prompt": string (the journaling prompt, 1-2 sentences max)
+}`
+      });
+      promptEl.textContent = result.prompt;
+    } catch(e) {
+      promptEl.textContent = `What's one thing that happened today that connects to your value of ${state.user.values[0] || 'growth'}?`;
+    }
+  }
+
+  window.getNewPrompt = function() {
+    document.getElementById('promptText').textContent = 'Generating...';
+    generateDailyPrompt();
+  };
+
+  // Mood selection
+  window.selectMood = function(mood, el) {
+    state.selectedMood = mood;
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+  };
+
+  // Word count & real-time sentiment
+  const journalEntry = document.getElementById('journalEntry');
+  let sentimentTimeout;
+  journalEntry.addEventListener('input', () => {
+    const words = journalEntry.value.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+    
+    clearTimeout(sentimentTimeout);
+    if (words > 20) {
+      sentimentTimeout = setTimeout(() => quickSentiment(journalEntry.value), 2000);
+    }
+  });
+
+  async function quickSentiment(text) {
+    const el = document.getElementById('realTimeSentiment');
+    try {
+      const result = await callAI('genericAI', {
+        prompt: `Analyze the emotional tone of this journal entry in 2-3 words. Entry: "${text.substring(0, 500)}"
+Return JSON: { "tone": string (2-3 word description like "hopeful but tired"), "level": string ("positive" or "neutral" or "negative" or "mixed") }`
+      });
+      const colors = { positive: 'text-[#00CEC9]', negative: 'text-[#FF7675]', neutral: 'text-[var(--text-muted)]', mixed: 'text-[#FDCB6E]' };
+      el.className = `text-xs ${colors[result.level] || colors.neutral}`;
+      el.textContent = `Tone: ${result.tone}`;
+    } catch(e) {}
+  }
+
+  // Save Entry
+  window.saveEntry = async function() {
+    const text = journalEntry.value.trim();
+    if (!text) { journalEntry.focus(); return; }
+    if (!state.selectedMood) {
+      document.querySelector('.mood-btn[data-mood="3"]').scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    const saveBtn = document.getElementById('saveBtn');
+    const btnText = document.getElementById('saveBtnText');
+    const btnLoading = document.getElementById('saveBtnLoading');
+    saveBtn.disabled = true;
+    btnText.classList.add('hidden');
+    btnLoading.classList.remove('hidden');
+
+    try {
+      const result = await callAI('genericAI', {
+        prompt: `You are an expert therapist and values-alignment coach analyzing a journal entry for ${state.user.name}.
+
+Their core values: ${state.user.values.join(', ')}
+Their life purpose: "${state.user.purpose}"
+Their goals: ${state.user.goals.join(', ')}
+Their mood today: ${MOOD_LABELS[state.selectedMood]} (${state.selectedMood}/6)
+
+Journal entry:
+"${text}"
+
+Analyze this entry thoroughly. Return JSON with this exact structure:
+{
+  "summary": string (2-3 sentence warm, insightful summary of what they're processing),
+  "emotional_tone": string ("very_negative" or "negative" or "mixed" or "neutral" or "positive" or "very_positive"),
+  "stress_level": number (1 to 10, where 10 is extremely stressed),
+  "values_detected": string[] (array of their core values that are reflected in this entry, use exact value names from their list),
+  "themes": string[] (array of 2-4 recurring themes/topics),
+  "cognitive_distortions": string[] (array of any cognitive distortions detected, like "catastrophizing", "black-and-white thinking", etc. Empty array if none),
+  "distortion_reframe": string (if distortions found, a gentle reframe suggestion. Empty string if none),
+  "micro_actions": string[] (array of 2-3 specific, small actionable steps they can take today that align with their values and goals),
+  "growth_insight": string (one sentence connecting this entry to their personal growth journey),
+  "goal_relevance": string[] (which of their goals this entry relates to, if any)
+}`
+      });
+
+      const entry = {
+        id: Date.now().toString(),
+        text,
+        mood: state.selectedMood,
+        createdAt: new Date().toISOString(),
+        analysis: result
+      };
+
+      state.entries.push(entry);
+      saveState();
+
+      // Show analysis
+      document.getElementById('analysisResult').classList.remove('hidden');
+      document.getElementById('analysisContent').innerHTML = `
+        <p class="mb-2">${result.summary}</p>
+        <p class="text-xs"><strong>Growth insight:</strong> ${result.growth_insight}</p>
+      `;
+
+      const valuesDiv = document.getElementById('valuesDetectedContent');
+      valuesDiv.innerHTML = (result.values_detected || []).map(v => 
+        `<span class="value-chip px-2 py-1 rounded-full text-xs">💎 ${v}</span>`
+      ).join('') || '<span class="text-xs">No specific values detected</span>';
+
+      const actionsDiv = document.getElementById('microActionsContent');
+      actionsDiv.innerHTML = (result.micro_actions || []).map(a =>
+        `<div class="micro-action pl-3 py-1 text-sm text-[var(--text-muted)]">${a}</div>`
+      ).join('');
+
+      if (result.cognitive_distortions && result.cognitive_distortions.length > 0) {
+        document.getElementById('distortionsBox').classList.remove('hidden');
+        document.getElementById('distortionsContent').innerHTML = `
+          <p class="mb-1"><strong>Patterns noticed:</strong> ${result.cognitive_distortions.join(', ')}</p>
+          <p class="text-xs italic">${result.distortion_reframe}</p>
+        `;
+      } else {
+        document.getElementById('distortionsBox').classList.add('hidden');
+      }
+
+      // Reset form
+      journalEntry.value = '';
+      document.getElementById('wordCount').textContent = '0 words';
+      document.getElementById('realTimeSentiment').textContent = '';
+      state.selectedMood = null;
+      document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+      updateStreak();
+
+      // Check stress
+      if (result.stress_level >= 7) {
+        showStressAlert(result.stress_level);
+      }
+
+    } catch(e) {
+      alert(e.message || 'Failed to analyze. Please try again.');
+    } finally {
+      saveBtn.disabled = false;
+      btnText.classList.remove('hidden');
+      btnLoading.classList.add('hidden');
+    }
+  };
+
+  // Stress management
+  function checkStressLevel() {
+    const recent = state.entries.slice(-3);
+    if (recent.length === 0) return;
+    
+    const avgStress = recent.reduce((s, e) => s + (e.analysis?.stress_level || 5), 0) / recent.length;
+    const avgMood = recent.reduce((s, e) => s + e.mood, 0) / recent.length;
+    
+    if (avgStress >= 6 || avgMood <= 2) {
+      showStressAlert(avgStress);
+    }
+  }
+
+  function showStressAlert(level) {
+    const alert = document.getElementById('stressAlert');
+    alert.classList.remove('hidden');
+    const msg = level >= 8 
+      ? "Your recent entries suggest high stress. Taking a moment for yourself can help. 💙"
+      : "I've noticed some tension in your writing. A quick reset might feel good. 🌿";
+    document.getElementById('stressMessage').textContent = msg;
+  }
+
+  window.showCopingExercise = async function() {
+    const modal = document.getElementById('copingModal');
+    modal.classList.remove('hidden');
+    const content = document.getElementById('copingContent');
+    content.innerHTML = '<div class="text-center py-4 pulse">Loading exercise...</div>';
+
+    try {
+      const result = await callAI('genericAI', {
+        prompt: `Generate a quick 2-minute coping/grounding exercise for a stressed college student. Make it practical and doable right now. Include step-by-step instructions. Be warm and supportive.
+
+Return JSON:
+{
+  "title": string (exercise name),
+  "duration": string (e.g., "2 minutes"),
+  "steps": string[] (array of 4-6 clear step instructions),
+  "closing": string (encouraging closing message)
+}`
+      });
+
+      content.innerHTML = `
+        <h4 class="font-semibold text-base mb-1">${result.title}</h4>
+        <p class="text-xs text-[var(--text-muted)] mb-3">⏱️ ${result.duration}</p>
+        <div class="space-y-3 mb-4">
+          ${(result.steps || []).map((s, i) => `
+            <div class="flex gap-3 items-start">
+              <span class="w-6 h-6 rounded-full gradient-bg flex items-center justify-center text-xs text-white flex-shrink-0">${i+1}</span>
+              <p class="text-sm text-[var(--text-muted)]">${s}</p>
+            </div>
+          `).join('')}
+        </div>
+        <p class="text-sm text-center italic text-[var(--accent)]">${result.closing}</p>
+      `;
+    } catch(e) {
+      content.innerHTML = `
+        <h4 class="font-semibold mb-3">Box Breathing 🌊</h4>
+        <div class="space-y-2 text-sm text-[var(--text-muted)]">
+          <p>1. Breathe in slowly for 4 seconds</p>
+          <p>2. Hold for 4 seconds</p>
+          <p>3. Breathe out for 4 seconds</p>
+          <p>4. Hold for 4 seconds</p>
+          <p>5. Repeat 4 times</p>
+        </div>
+      `;
+    }
+  };
+
+  window.closeCopingModal = function() {
+    document.getElementById('copingModal').classList.add('hidden');
+  };
+
+  // History
+  function renderHistory() {
+    const list = document.getElementById('entriesList');
+    const noEntries = document.getElementById('noEntries');
+
+    if (state.entries.length === 0) {
+      list.innerHTML = '';
+      noEntries.classList.remove('hidden');
+      return;
+    }
+
+    noEntries.classList.add('hidden');
+    const sorted = [...state.entries].reverse();
+    
+    list.innerHTML = sorted.map(entry => {
+      const dt = DateTime.fromISO(entry.createdAt);
+      const themes = (entry.analysis?.themes || []).slice(0, 2).join(', ');
+      return `
+        <div class="entry-card glass rounded-2xl p-4 cursor-pointer" onclick="window.viewEntry('${entry.id}')">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <p class="text-sm font-medium">${dt.toFormat('EEEE, MMM d')}</p>
+              <p class="text-xs text-[var(--text-muted)]">${dt.toFormat('h:mm a')}</p>
+            </div>
+            <span class="text-2xl">${MOODS[entry.mood]}</span>
+          </div>
+          <p class="text-sm text-[var(--text-muted)] line-clamp-2 mb-2">${entry.text.substring(0, 120)}${entry.text.length > 120 ? '...' : ''}</p>
+          ${themes ? `<p class="text-xs text-[var(--primary-light)]">🏷️ ${themes}</p>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.viewEntry = function(id) {
+    const entry = state.entries.find(e => e.id === id);
+    if (!entry) return;
+    state.viewingEntryId = id;
+
+    const dt = DateTime.fromISO(entry.createdAt);
+    const modal = document.getElementById('entryModal');
+    const content = document.getElementById('entryModalContent');
+
+    content.innerHTML = `
+      <div class="mb-4">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="text-3xl">${MOODS[entry.mood]}</span>
+          <div>
+            <p class="font-semibold">${dt.toFormat('EEEE, MMMM d, yyyy')}</p>
+            <p class="text-sm text-[var(--text-muted)]">${dt.toFormat('h:mm a')} · ${MOOD_LABELS[entry.mood]}</p>
+          </div>
+        </div>
+        <div class="glass rounded-2xl p-4 mb-4">
+          <p class="text-sm leading-relaxed whitespace-pre-wrap">${entry.text}</p>
+        </div>
+        ${entry.analysis ? `
+          <div class="glass rounded-2xl p-4 mb-3">
+            <h4 class="font-semibold text-sm mb-2">🔍 Analysis</h4>
+            <p class="text-sm text-[var(--text-muted)] mb-2">${entry.analysis.summary}</p>
+            <p class="text-xs text-[var(--accent)]">${entry.analysis.growth_insight}</p>
+          </div>
+          ${entry.analysis.values_detected?.length ? `
+          <div class="glass rounded-2xl p-4 mb-3">
+            <h4 class="font-semibold text-sm mb-2">💎 Values</h4>
+            <div class="flex flex-wrap gap-2">${entry.analysis.values_detected.map(v => `<span class="value-chip px-2 py-1 rounded-full text-xs">${v}</span>`).join('')}</div>
+          </div>` : ''}
+          ${entry.analysis.micro_actions?.length ? `
+          <div class="glass rounded-2xl p-4 mb-3">
+            <h4 class="font-semibold text-sm mb-2">⚡ Actions</h4>
+            ${entry.analysis.micro_actions.map(a => `<div class="micro-action pl-3 py-1 text-sm text-[var(--text-muted)]">${a}</div>`).join('')}
+          </div>` : ''}
+          ${entry.analysis.cognitive_distortions?.length ? `
+          <div class="glass rounded-2xl p-4 mb-3">
+            <h4 class="font-semibold text-sm mb-2">🧠 Thinking Patterns</h4>
+            <p class="text-sm text-[var(--text-muted)]">${entry.analysis.cognitive_distortions.join(', ')}</p>
+            <p class="text-xs italic mt-1 text-[var(--accent)]">${entry.analysis.distortion_reframe}</p>
+          </div>` : ''}
+        ` : ''}
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+  };
+
+  window.closeEntryModal = function() {
+    document.getElementById('entryModal').classList.add('hidden');
+    state.viewingEntryId = null;
+  };
+
+  window.deleteEntry = function() {
+    if (!state.viewingEntryId) return;
+    if (!confirm('Delete this entry? This cannot be undone.')) return;
+    state.entries = state.entries.filter(e => e.id !== state.viewingEntryId);
+    saveState();
+    closeEntryModal();
+    renderHistory();
+  };
+
+  // Insights
+  async function generateInsights() {
+    const loading = document.getElementById('insightsLoading');
+    const content = document.getElementById('insightsContent');
+    const noInsights = document.getElementById('noInsights');
+
+    if (state.entries.length < 3) {
+      loading.classList.add('hidden');
+      content.classList.add('hidden');
+      noInsights.classList.remove('hidden');
+      return;
+    }
+
+    noInsights.classList.add('hidden');
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+
+    // Render mood chart
+    renderMoodChart();
+
+    const recentEntries = state.entries.slice(-7).map(e => ({
+      date: DateTime.fromISO(e.createdAt).toFormat('MMM d'),
+      mood: e.mood,
+      themes: e.analysis?.themes || [],
+      values: e.analysis?.values_detected || [],
+      stress: e.analysis?.stress_level || 5,
+      summary: e.analysis?.summary || e.text.substring(0, 200)
+    }));
+
+    try {
+      const result = await callAI('genericAI', {
+        prompt: `You are an expert personal growth coach creating a weekly synthesis for ${state.user.name}.
+
+Their values: ${state.user.values.join(', ')}
+Their purpose: "${state.user.purpose}"
+Their goals: ${state.user.goals.join(', ')}
+
+Recent entries (last 7 days):
+${JSON.stringify(recentEntries, null, 2)}
+
+Create a comprehensive weekly synthesis. Return JSON with this exact structure:
+{
+  "synthesis": string (3-4 paragraph warm, insightful weekly narrative highlighting progress, hidden patterns, and growth areas. Be specific, reference actual themes from their entries. Use second person "you"),
+  "themes": string[] (array of 3-5 recurring themes across all entries),
+  "values_alignment": object[] (array of objects like [{"value": string, "score": number (1-10 alignment score), "note": string (brief note)}] for each of their core values),
+  "goal_progress": object[] (array of objects like [{"goal": string, "progress": string ("on_track" or "needs_attention" or "not_mentioned"), "suggestion": string}] for each of their goals),
+  "weekly_actions": string[] (array of 3-5 specific micro-actions for the coming week that bridge their reflections to their goals and values),
+  "hidden_pattern": string (one surprising or hidden pattern you noticed that they might not have seen),
+  "encouragement": string (a warm, specific encouragement message)
+}`
+      });
+
+      // Render synthesis
+      document.getElementById('synthesisContent').innerHTML = `
+        <div class="mb-3 whitespace-pre-line">${result.synthesis}</div>
+        <div class="coping-card rounded-xl p-3 mb-2">
+          <p class="text-xs font-medium text-[var(--accent)] mb-1">🔮 Hidden Pattern</p>
+          <p class="text-sm">${result.hidden_pattern}</p>
+        </div>
+        <p class="text-sm italic text-[var(--warm)]">💛 ${result.encouragement}</p>
+      `;
+
+      // Themes
+      document.getElementById('themesContent').innerHTML = (result.themes || []).map(t =>
+        `<span class="value-chip px-3 py-1.5 rounded-full text-sm">🏷️ ${t}</span>`
+      ).join('');
+
+      // Values alignment
+      document.getElementById('valuesAlignment').innerHTML = (result.values_alignment || []).map(v => `
+        <div class="flex items-center gap-3">
+          <span class="text-sm flex-shrink-0 w-24 truncate">${v.value}</span>
+          <div class="flex-1 h-2 bg-[var(--surface2)] rounded-full overflow-hidden">
+            <div class="h-full gradient-bg sentiment-bar rounded-full" style="width: ${(v.score || 5) * 10}%"></div>
+          </div>
+          <span class="text-xs text-[var(--text-muted)] w-8 text-right">${v.score}/10</span>
+        </div>
+      `).join('');
+
+      // Goal progress
+      document.getElementById('goalProgress').innerHTML = (result.goal_progress || []).map(g => {
+        const icons = { on_track: '✅', needs_attention: '⚠️', not_mentioned: '🔘' };
+        return `
+          <div class="glass-light rounded-xl p-3">
+            <div class="flex items-start gap-2">
+              <span>${icons[g.progress] || '🔘'}</span>
+              <div>
+                <p class="text-sm font-medium">${g.goal}</p>
+                <p class="text-xs text-[var(--text-muted)]">${g.suggestion}</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Weekly actions
+      document.getElementById('weeklyActions').innerHTML = (result.weekly_actions || []).map(a =>
+        `<div class="micro-action pl-3 py-1.5 text-sm text-[var(--text-muted)]">${a}</div>`
+      ).join('');
+
+      loading.classList.add('hidden');
+      content.classList.remove('hidden');
+    } catch(e) {
+      loading.innerHTML = `<p class="text-sm text-[var(--danger)]">${e.message}</p>`;
+    }
+  }
+
+  function renderMoodChart() {
+    const ctx = document.getElementById('moodChart');
+    if (!ctx) return;
+
+    const last7 = state.entries.slice(-7);
+    const labels = last7.map(e => DateTime.fromISO(e.createdAt).toFormat('MMM d'));
+    const data = last7.map(e => e.mood);
+
+    if (moodChart) moodChart.destroy();
+    
+    moodChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Mood',
+          data,
+          borderColor: '#6C5CE7',
+          backgroundColor: 'rgba(108, 92, 231, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#A29BFE',
+          pointRadius: 6,
+          pointHoverRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          y: {
+            min: 0,
+            max: 7,
+            ticks: {
+              callback: v => MOODS[v] || '',
+              color: '#9B8FBF',
+              font: { size: 14 }
+            },
+            grid: { color: 'rgba(108, 92, 231, 0.1)' }
+          },
+          x: {
+            ticks: { color: '#9B8FBF', font: { size: 10 } },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${MOODS[ctx.raw]} ${MOOD_LABELS[ctx.raw]}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Settings
+  window.showSettings = function() {
+    document.getElementById('settingsModal').classList.remove('hidden');
+    document.getElementById('settingsName').value = state.user.name;
+    document.getElementById('settingsPurpose').value = state.user.purpose;
+    
+    renderSettingsValues();
+    renderSettingsGoals();
+  };
+
+  function renderSettingsValues() {
+    const container = document.getElementById('settingsValues');
+    container.innerHTML = state.user.values.map(v =>
+      `<span class="value-chip selected px-3 py-1.5 rounded-full text-sm flex items-center gap-1">${v} <button onclick="removeSettingsValue('${v}')" class="ml-1 text-xs opacity-60 hover:opacity-100">✕</button></span>`
+    ).join('');
+  }
+
+  function renderSettingsGoals() {
+    const container = document.getElementById('settingsGoals');
+    container.innerHTML = state.user.goals.map((g, i) =>
+      `<div class="flex items-center gap-2">
+        <input type="text" value="${g}" class="settings-goal-input flex-1 px-4 py-3 rounded-xl text-base" data-index="${i}">
+        <button onclick="removeSettingsGoal(${i})" class="text-[var(--danger)] px-2">✕</button>
+      </div>`
+    ).join('');
+  }
+
+  window.removeSettingsValue = function(value) {
+    state.user.values = state.user.values.filter(v => v !== value);
+    renderSettingsValues();
+  };
+
+  window.addSettingsValue = function() {
+    const input = document.getElementById('settingsNewValue');
+    const val = input.value.trim();
+    if (val && !state.user.values.includes(val)) {
+      state.user.values.push(val);
+      renderSettingsValues();
+      input.value = '';
+    }
+  };
+
+  window.removeSettingsGoal = function(index) {
+    state.user.goals.splice(index, 1);
+    renderSettingsGoals();
+  };
+
+  window.addSettingsGoal = function() {
+    const input = document.getElementById('settingsNewGoal');
+    const val = input.value.trim();
+    if (val) {
+      state.user.goals.push(val);
+      renderSettingsGoals();
+      input.value = '';
+    }
+  };
+
+  window.saveSettings = function() {
+    state.user.name = document.getElementById('settingsName').value.trim() || state.user.name;
+    state.user.purpose = document.getElementById('settingsPurpose').value.trim() || state.user.purpose;
+    
+    // Update goals from inputs
+    const goalInputs = document.querySelectorAll('.settings-goal-input');
+    state.user.goals = Array.from(goalInputs).map(i => i.value.trim()).filter(Boolean);
+    
+    saveState();
+    closeSettings();
+    document.getElementById('headerSubtext').textContent = `${getGreeting()}, ${state.user.name} 👋`;
+  };
+
+  window.closeSettings = function() {
+    document.getElementById('settingsModal').classList.add('hidden');
+  };
+
+  window.exportData = function() {
+    const data = JSON.stringify(state, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reflectai-export-${DateTime.now().toFormat('yyyy-MM-dd')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  window.resetApp = function() {
+    if (!confirm('This will delete ALL your data. Are you sure?')) return;
+    if (!confirm('Really? This cannot be undone.')) return;
+    localStorage.removeItem('reflectai_state');
+    location.reload();
+  };
+
+  // Init
+  init();
+})();
+</script>
+</body>
+</html>
